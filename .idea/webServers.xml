@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="eb531b23-979f-4cbf-81d3-532ca0e8c84f" name="Olap">
+        <fileTransfer rootFolder="/etc/microservices" accessType="SFTP" host="87.236.22.33" port="22" sshConfigId="5cf1ec38-c741-4e6b-b469-41f0d2ff94a0" sshConfig="root@87.236.22.33:22 key" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
