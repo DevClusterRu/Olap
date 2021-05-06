@@ -11,6 +11,7 @@ import (
 func FileParsing(fname string, pool string)  {
 
 	engine.Init()
+	engine.Mongo.PoolStatusChange(pool, "busy")
 
 	file, err := os.Open(fname)
 	if err != nil{
@@ -52,11 +53,15 @@ func FileParsing(fname string, pool string)  {
 
 	}
 
+	engine.Mongo.PoolStatusChange(pool, "active")
+
+
 }
 
 func extractFields(str string, pool string) bool {
 	fields := strings.Split(str,",")
 	if len(fields)<3{
+		fmt.Println("Low")
 		return false
 	}
 	engine.Mongo.InsertRecord(pool, fields[0],fields[1],fields[2])

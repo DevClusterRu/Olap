@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,26 +9,27 @@ import (
 	"olap/files"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 func CsvHandler(w http.ResponseWriter, req *http.Request) {
 
 	if req.Method == "POST" {
 
-		if req.FormValue("pool")=="" {
+		if req.FormValue("pool") == "" {
 			http.Error(w, "No pool", 500)
 			return
 		}
 
 		src, hdr, err := req.FormFile("filename")
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, "filename!!"+err.Error(), 500)
 			return
 		}
 		defer src.Close()
 
 		//dst, err := os.Create(filepath.Join(os.TempDir(), hdr.Filename))
-		fname:=filepath.Join("./", hdr.Filename)
+		fname := filepath.Join("./", hdr.Filename)
 		dst, err := os.Create(fname)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -38,7 +38,7 @@ func CsvHandler(w http.ResponseWriter, req *http.Request) {
 		defer dst.Close()
 
 		_, err = io.Copy(dst, src)
-		if err!=nil{
+		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		} else {
@@ -50,40 +50,89 @@ func CsvHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
+func PoolListHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("content-Type", "application/json")
+	fmt.Fprintf(w, Mongo.PoolList())
+}
+
 func PoolCreateHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	if req.Form.Get("poolname")!=""{
-		Mongo.AddPool(req.Form.Get("poolname"))
+	poolId := "ERROR"
+	if req.Form.Get("name") != "" && req.Form.Get("description") != "" {
+		poolId = Mongo.AddPool(req.Form.Get("name"), req.Form.Get("description"))
 	}
-	fmt.Fprintf(w, "OK")
+	fmt.Fprintf(w, poolId)
 }
 
 func PoolAggregateHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	if req.Form.Get("idpool")!=""{
-		packReady:=Mongo.PoolAggregation(req.Form.Get("idpool"))
-		b,_:=json.Marshal(packReady)
-		fmt.Fprintf(w, string(b))
+	if req.Form.Get("poolId") != "" {
+		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.Form.Get("poolId")))
+		fmt.Fprintf(w, aggregation)
 	}
-
 }
 
 func PoolRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	if req.Form.Get("idpool")!=""{
-		Mongo.AddPool(req.Form.Get("idpool"))
+	if req.Form.Get("poolId") != "" {
+		res, err := Mongo.RemovePool(req.Form.Get("poolId"))
+		if err != nil {
+			fmt.Fprintf(w, err.Error())
+		} else {
+			fmt.Fprintf(w, strconv.Itoa(int(res.DeletedCount)))
+		}
+	} else {
+		fmt.Fprintf(w, "ERROR")
 	}
-	fmt.Fprintf(w, "OK")
+
 }
 
+func LinkCreateHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	if req.Form.Get("poolId") != "" {
+		if Mongo.CreateLink(req.Form.Get("poolId"), req.Form.Get("from"), req.Form.Get("to")) == true {
+			fmt.Fprintf(w, "OK")
+		} else {
+			fmt.Fprintf(w, "ERROR")
+		}
+	} else {
+		fmt.Fprintf(w, "Dont see poolId")
+	}
+}
+
+func LinkRemoveHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	if req.Form.Get("linkId") != "" {
+		res, err := Mongo.RemoveLink(req.Form.Get("linkId"))
+		if err != nil {
+			fmt.Fprintf(w, err.Error())
+		} else {
+			fmt.Fprintf(w, strconv.Itoa(int(res.DeletedCount)))
+		}
+	} else {
+		fmt.Fprintf(w, "ERROR")
+	}
+}
+
+func EmptyHandler(w http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(w, "U on root")
+}
 
 func main() {
 
+	fmt.Println("Start v1.2")
+
 	Init()
-	http.HandleFunc("/csvPush", CsvHandler)
-	http.HandleFunc("/poolCreate", PoolCreateHandler)
-	http.HandleFunc("/poolRemove", PoolRemoveHandler)
-	http.HandleFunc("/poolAggregate", PoolAggregateHandler)
+	http.HandleFunc("/", EmptyHandler)
+	http.HandleFunc("/api/csvPush", CsvHandler)
+
+	http.HandleFunc("/api/linkCreate", LinkCreateHandler)
+	http.HandleFunc("/api/linkRemove", LinkRemoveHandler)
+
+	http.HandleFunc("/api/poolCreate", PoolCreateHandler)
+	http.HandleFunc("/api/poolList", PoolListHandler)
+	http.HandleFunc("/api/poolRemove", PoolRemoveHandler)
+	http.HandleFunc("/api/poolAggregate", PoolAggregateHandler)
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
 		log.Fatal(err)
