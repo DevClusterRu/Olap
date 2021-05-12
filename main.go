@@ -78,7 +78,6 @@ func PoolCreateHandler(w http.ResponseWriter, req *http.Request) {
 func PoolAggregateHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	if req.Form.Get("poolId") != "" {
-
 		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.URL.Query()))
 		w.Header().Set("content-Type", "application/json")
 		fmt.Fprintf(w, aggregation)
@@ -156,10 +155,8 @@ func main() {
 	Init()
 	http.HandleFunc("/", EmptyHandler)
 	http.HandleFunc("/api/csvPush", CsvHandler)
-
 	http.HandleFunc("/api/linkCreate", LinkCreateHandler)
 	http.HandleFunc("/api/linkRemove", LinkRemoveHandler)
-
 	http.HandleFunc("/api/poolCreate", PoolCreateHandler)
 	http.HandleFunc("/api/poolList", PoolListHandler)
 	http.HandleFunc("/api/poolRemove", PoolRemoveHandler)

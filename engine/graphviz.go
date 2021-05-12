@@ -3,7 +3,6 @@ package engine
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/goccy/go-graphviz"
 	"github.com/goccy/go-graphviz/cgraph"
 	"log"
@@ -51,12 +50,16 @@ func  DoGraph(agr AggregationResult) string {
 		if err != nil {
 			log.Println(err)
 		}
+
+
+
 		//TODO Decorate me!
-		//nodesPointers[v].
+		nodesPointers[v].SetShape(cgraph.HexagonShape)
+		nodesPointers[v].SetLabel("T")
+		nodesPointers[v].SetComment("Some comment")
 
-		fmt.Println(nodeName)
+		//fmt.Println(nodeName)
 	}
-
 
 
 	for k,v:=range links {

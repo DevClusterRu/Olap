@@ -19,25 +19,23 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 	var dateStart, dateEnd time.Time
 	var err error
 
-	layout := "2006-01-02T15:04:05.000Z"
-	poolId:=query["poolId"][0]
+
+	poolId:=""
+	if len(query["poolId"])>0 {
+		poolId = query["poolId"][0]
+	}
 	if len(query["dataRangeStart"])>0 {
-		dateStart, err = time.Parse(layout, query["dataRangeStart"][0])
-		if err != nil {
-			fmt.Println(err)
-		}
+		dateStart = StrToDate(query["dataRangeStart"][0])
 	}
 	if len(query["dataRangeEnd"])>0 {
-		dateEnd, err = time.Parse(layout, query["dataRangeEnd"][0])
-		if err != nil {
-			fmt.Println(err)
-		}
+		dateEnd = StrToDate(query["dataRangeEnd"][0])
 	}
+
+	fmt.Println(dateStart, dateEnd)
 
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	poolIdObject, _ := primitive.ObjectIDFromHex(poolId)
 	var aggregationResult AggregationResult
-
 
 	matchStage := bson.D{{"$match", bson.D{{"pool_id",poolIdObject}}}}
 	//Get total distinct objects
@@ -91,15 +89,10 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 		match = append(match, bson.E{"$or", ifaceC})
 	}
 
-
-
 	//Date append
 	if len(query["dataRangeStart"])>0 && len(query["dataRangeEnd"])>0 {
 		match = append(match, bson.E{"timestamp", bson.M{"$gte": dateStart, "$lte": dateEnd}})
 	}
-
-
-	fmt.Println(match)
 
 	nodes, err := m.collection("test").Find(ctx, match, &options.FindOptions{Sort: bson.D{{"object",1}, {"timestamp",1}}})
 	if err!=nil{
@@ -109,7 +102,6 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 	if err = nodes.All(ctx, &data); err != nil {
 		log.Println("When showInfoCursor ->", err)
 	}
-
 
 	fmt.Println("Found ",len(data)," items")
 
