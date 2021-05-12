@@ -14,7 +14,7 @@ import (
 
 
 
-func DoGraph(agr AggregationResult) string {
+func  DoGraph(agr AggregationResult) string {
 
 	g := graphviz.New()
 	graph, err := g.Graph()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -9,8 +10,18 @@ import (
 	"olap/files"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 )
+
+func checkMethod(w http.ResponseWriter, req *http.Request) bool {
+	if req.Method=="POST"{
+		return true
+	} else{
+		fmt.Fprintf(w, "Sorry, only POST method supported.")
+	}
+	return false
+}
 
 func CsvHandler(w http.ResponseWriter, req *http.Request) {
 
@@ -114,7 +125,25 @@ func LinkRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func StreamHandler(w http.ResponseWriter, req *http.Request) {
+	if checkMethod(w, req) {
+		var p Stream
+		err := json.NewDecoder(req.Body).Decode(&p)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		Mongo.InsertRecord(p.Pool,p.Object,p.Event, p.Timestamp)
+
+		fmt.Fprintf(w, "OK")
+	}
+}
+
 func EmptyHandler(w http.ResponseWriter, req *http.Request) {
+
+	var validID = regexp.MustCompile(`\/.*$`)
+	fmt.Println(validID.FindString(req.URL.Path))
+
 	fmt.Fprintf(w, "U on root")
 }
 
@@ -133,6 +162,9 @@ func main() {
 	http.HandleFunc("/api/poolList", PoolListHandler)
 	http.HandleFunc("/api/poolRemove", PoolRemoveHandler)
 	http.HandleFunc("/api/poolAggregate", PoolAggregateHandler)
+
+	http.HandleFunc("/api/stream", StreamHandler)
+
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
 		log.Fatal(err)

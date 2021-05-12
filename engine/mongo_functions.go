@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -57,18 +56,8 @@ func (m *MongoStructure) GraphPoolAggregation(poolId string) AggregationResult {
 
 func (m *MongoStructure) InsertRecord(pool string, object string, event string, tme string) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-
-	layout := "2006-01-02 15:04:05"
-
-	fmt.Println("TME: " + tme)
-
-	t, err := time.Parse(layout, strings.TrimSpace(tme))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	poolId, _ := primitive.ObjectIDFromHex(pool)
-	doc := bson.M{"pool_id": poolId, "object": object, "event": event, "timestamp": t}
+	doc := bson.M{"pool_id": poolId, "object": object, "event": event, "timestamp": StrToDate(tme)}
 	m.collection("test").InsertOne(ctx, doc, nil)
 }
 
