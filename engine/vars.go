@@ -3,6 +3,7 @@ package engine
 import (
 	"github.com/araddon/dateparse"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 )
@@ -17,13 +18,15 @@ var Mongo MongoStructure
 var Way string
 
 type AggregationResult struct {
-	Nodes []bson.M
-	NodesCount int64
-	AllObjects []bson.M
-	AllEvents []bson.M
-	NodesMap map[string]int
-	LinksMap map[string]int
+	Nodes        []bson.M
+	NodesCount   int64
+	AllObjects   []bson.M
+	AllEvents    []bson.M
+	NodesMap     map[string]int
+	LinksMap     map[string]int
 	NodesSorting []string
+	MinDate      primitive.DateTime
+	MaxDate      primitive.DateTime
 }
 
 type Stream struct {
@@ -35,8 +38,10 @@ type Stream struct {
 
 type JsonReturn struct {
 	Filename string
-	Objects []bson.M
-	Events []bson.M
+	Objects  []bson.M
+	Events   []bson.M
+	MinTime  primitive.DateTime
+	MaxTime  primitive.DateTime
 }
 
 func Init()  {
@@ -46,5 +51,3 @@ func Init()  {
 	Mongo.OptsDistinct = options.Distinct()
 	Mongo.ClientInit()
 }
-
-

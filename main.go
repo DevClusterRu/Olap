@@ -78,7 +78,9 @@ func PoolCreateHandler(w http.ResponseWriter, req *http.Request) {
 func PoolAggregateHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	if req.Form.Get("poolId") != "" {
-		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.Form.Get("poolId")))
+
+		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.URL.Query()))
+		w.Header().Set("content-Type", "application/json")
 		fmt.Fprintf(w, aggregation)
 	}
 }
@@ -162,9 +164,7 @@ func main() {
 	http.HandleFunc("/api/poolList", PoolListHandler)
 	http.HandleFunc("/api/poolRemove", PoolRemoveHandler)
 	http.HandleFunc("/api/poolAggregate", PoolAggregateHandler)
-
 	http.HandleFunc("/api/stream", StreamHandler)
-
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
 		log.Fatal(err)

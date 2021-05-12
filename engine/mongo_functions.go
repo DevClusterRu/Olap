@@ -5,23 +5,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"net/url"
 	"time"
 )
 
-func (m *MongoStructure) GraphPoolAggregation(poolId string) AggregationResult {
+func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResult {
+
+	var dateStart, dateEnd time.Time
+	var err error
+
+	layout := "2006-01-02T15:04:05.000Z"
+	poolId:=query["poolId"][0]
+	if len(query["dataRangeStart"])>0 {
+		dateStart, err = time.Parse(layout, query["dataRangeStart"][0])
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	if len(query["dataRangeEnd"])>0 {
+		dateEnd, err = time.Parse(layout, query["dataRangeEnd"][0])
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	poolIdObject, _ := primitive.ObjectIDFromHex(poolId)
 	var aggregationResult AggregationResult
 
+
+	matchStage := bson.D{{"$match", bson.D{{"pool_id",poolIdObject}}}}
 	//Get total distinct objects
 	groupStage := bson.D{{"$group", bson.D{{"_id", "$object"}}}}
 	sortStage := bson.D{{"$sort", bson.D{{"_id", 1}}}}
-	distinctObjects, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{groupStage,sortStage})
+	distinctObjects, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage,groupStage,sortStage})
 	if err!=nil{
 		log.Println(err)
 	}
@@ -33,22 +55,73 @@ func (m *MongoStructure) GraphPoolAggregation(poolId string) AggregationResult {
 	//Get total events
 	groupStage = bson.D{{"$group", bson.D{{"_id", "$event"}}}}
 	sortStage = bson.D{{"$sort", bson.D{{"_id", 1}}}}
-	distinctEvents, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{groupStage,sortStage})
+	distinctEvents, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage,groupStage,sortStage})
 	var distinctEv []bson.M
 	if err = distinctEvents.All(ctx, &distinctEv); err != nil {
 		log.Println("When distinctEvents ->", err)
 	}
 
-	nodes, err := m.collection("test").Find(ctx, bson.M{"pool_id":poolIdObject}, &options.FindOptions{Sort: bson.M{"_id": 1}})
+	//GetMin&Max date
+	groupStage = bson.D{{"$group", bson.D{{"_id", bsontype.Null},{"minDate", bson.M{ "$min": "$timestamp" }},{"maxDate", bson.M{ "$max": "$timestamp" }}}}}
+	dates, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage,groupStage,sortStage})
+	var datesM []bson.M
+	if err = dates.All(ctx, &datesM); err != nil {
+		log.Println("When dates ->", err)
+	}
+
+
+
+	match:=bson.D{{"pool_id",poolIdObject}}
+	//Events OR append
+
+	var ifaceE []interface{}
+	for _,v:=range query["events[]"]{
+		ifaceE = append(ifaceE,bson.D{{"event", v}})
+	}
+	if len(ifaceE)>0 {
+		match = append(match, bson.E{"$or", ifaceE})
+	}
+
+	//Cases OR append
+	var ifaceC []interface{}
+	for _,v:=range query["cases[]"]{
+		ifaceC = append(ifaceC,bson.D{{"object", v}})
+	}
+	if len(ifaceC)>0 {
+		match = append(match, bson.E{"$or", ifaceC})
+	}
+
+
+
+	//Date append
+	if len(query["dataRangeStart"])>0 && len(query["dataRangeEnd"])>0 {
+		match = append(match, bson.E{"timestamp", bson.M{"$gte": dateStart, "$lte": dateEnd}})
+	}
+
+
+	fmt.Println(match)
+
+	nodes, err := m.collection("test").Find(ctx, match, &options.FindOptions{Sort: bson.D{{"object",1}, {"timestamp",1}}})
+	if err!=nil{
+		fmt.Println(err)
+	}
 	var data []bson.M
 	if err = nodes.All(ctx, &data); err != nil {
 		log.Println("When showInfoCursor ->", err)
 	}
 
+
+	fmt.Println("Found ",len(data)," items")
+
 	aggregationResult.Nodes = data
 	aggregationResult.NodesCount = int64(len(data))
 	aggregationResult.AllObjects = distinctObj
 	aggregationResult.AllEvents = distinctEv
+	if len(datesM)>0 {
+		aggregationResult.MinDate = datesM[0]["minDate"].(primitive.DateTime)
+		aggregationResult.MaxDate = datesM[0]["maxDate"].(primitive.DateTime)
+	}
+
 
 	return BaseCalculation(aggregationResult)
 
