@@ -67,7 +67,9 @@ func PoolCreateHandler(w http.ResponseWriter, req *http.Request) {
 func PoolAggregateHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	if req.Form.Get("poolId") != "" {
-		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.Form.Get("poolId")))
+
+		aggregation := DoGraph(Mongo.GraphPoolAggregation(req.URL.Query()))
+		w.Header().Set("content-Type", "application/json")
 		fmt.Fprintf(w, aggregation)
 	}
 }
@@ -114,6 +116,21 @@ func LinkRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func StreamHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	if req.Form.Get("poolId") != "" {
+		res, err := Mongo.RemoveLink(req.Form.Get("linkId"))
+		if err != nil {
+			fmt.Fprintf(w, err.Error())
+		} else {
+			fmt.Fprintf(w, strconv.Itoa(int(res.DeletedCount)))
+		}
+	} else {
+		fmt.Fprintf(w, "ERROR")
+	}
+}
+
+
 func EmptyHandler(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "U on root")
 }
@@ -133,6 +150,7 @@ func main() {
 	http.HandleFunc("/api/poolList", PoolListHandler)
 	http.HandleFunc("/api/poolRemove", PoolRemoveHandler)
 	http.HandleFunc("/api/poolAggregate", PoolAggregateHandler)
+	http.HandleFunc("/api/stream", StreamHandler)
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
 		log.Fatal(err)
