@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"olap/engine"
 	"strconv"
 	"testing"
 	"time"
@@ -109,9 +108,8 @@ func TestTme(t *testing.T)  {
 }
 
 func TestGraphPoolAggregation(t *testing.T)  {
-	engine.Init()
-	engine.DoGraph(engine.Mongo.GraphPoolAggregation("607fe9aadf1560b2a03d776d"))
-
+//	engine.Init()
+//	engine.DoGraph(engine.Mongo.GraphPoolAggregation("607fe9aadf1560b2a03d776d"))
 }
 
 //

@@ -119,11 +119,13 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 
 }
 
-func (m *MongoStructure) InsertRecord(pool string, object string, event string, tme string) {
+func (m *MongoStructure) InsertRecord(document bson.M) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	poolId, _ := primitive.ObjectIDFromHex(pool)
-	doc := bson.M{"pool_id": poolId, "object": object, "event": event, "timestamp": StrToDate(tme)}
-	m.collection("test").InsertOne(ctx, doc, nil)
+	poolId, _ := primitive.ObjectIDFromHex(document["pool_id"].(string))
+	document["pool_id"] = poolId
+	//doc := bson.M{"pool_id": poolId, "object": object, "event": event, "timestamp": StrToDate(tme)}
+	m.collection("test").InsertOne(ctx, document, nil)
+	//pool string, object string, event string, tme string
 }
 
 func (m *MongoStructure) AddPool(name string, description string) string {
