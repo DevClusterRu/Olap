@@ -76,7 +76,7 @@ func extractFields(str string, poolId string, ref []string) bool {
 	document := make(bson.M)
 
 	paramNumber := 1
-	document["pool_id"] = poolId
+
 	for k, v := range fields {
 		switch ref[k] {
 		case "object":
@@ -101,7 +101,7 @@ func extractFields(str string, poolId string, ref []string) bool {
 		}
 	}
 
-	Mongo.InsertRecord(document)
+	Mongo.InsertRecord(poolId, document)
 	return true
 }
 

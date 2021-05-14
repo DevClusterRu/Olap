@@ -31,17 +31,12 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 		dateEnd = StrToDate(query["dataRangeEnd"][0])
 	}
 
-	fmt.Println(dateStart, dateEnd)
-
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	poolIdObject, _ := primitive.ObjectIDFromHex(poolId)
 	var aggregationResult AggregationResult
 
-	matchStage := bson.D{{"$match", bson.D{{"pool_id", poolIdObject}}}}
-	//Get total distinct objects
 	groupStage := bson.D{{"$group", bson.D{{"_id", "$object"}}}}
 	sortStage := bson.D{{"$sort", bson.D{{"_id", 1}}}}
-	distinctObjects, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, sortStage})
+	distinctObjects, err := m.collection(poolId).Aggregate(ctx, mongo.Pipeline{groupStage, sortStage})
 	if err != nil {
 		log.Println(err)
 	}
@@ -53,7 +48,7 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 	//Get total events
 	groupStage = bson.D{{"$group", bson.D{{"_id", "$event"}}}}
 	sortStage = bson.D{{"$sort", bson.D{{"_id", 1}}}}
-	distinctEvents, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, sortStage})
+	distinctEvents, err := m.collection(poolId).Aggregate(ctx, mongo.Pipeline{groupStage, sortStage})
 	if err != nil {
 		log.Println("When distinctEvents1 ->", err)
 	}
@@ -65,13 +60,14 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 
 	//GetMin&Max date
 	groupStage = bson.D{{"$group", bson.D{{"_id", bsontype.Null}, {"minDate", bson.M{"$min": "$timestamp"}}, {"maxDate", bson.M{"$max": "$timestamp"}}}}}
-	dates, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, sortStage})
+	dates, err := m.collection(poolId).Aggregate(ctx, mongo.Pipeline{groupStage, sortStage})
 	var datesM []bson.M
 	if err = dates.All(ctx, &datesM); err != nil {
 		log.Println("When dates ->", err)
 	}
 
-	match := bson.D{{"pool_id", poolIdObject}}
+	match := bson.D{{"_id", bson.D{{"$exists", 1}}}}
+
 	//Events OR append
 
 	var ifaceE []interface{}
@@ -96,7 +92,7 @@ func (m *MongoStructure) GraphPoolAggregation(query url.Values) AggregationResul
 		match = append(match, bson.E{"timestamp", bson.M{"$gte": dateStart, "$lte": dateEnd}})
 	}
 
-	nodes, err := m.collection("test").Find(ctx, match, &options.FindOptions{Sort: bson.D{{"object", 1}, {"timestamp", 1}}})
+	nodes, err := m.collection(poolId).Find(ctx, match, &options.FindOptions{Sort: bson.D{{"object", 1}, {"timestamp", 1}}})
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -178,18 +174,16 @@ func prepareForFront(data []bson.M) AnswPeriod {
 
 func (m *MongoStructure) CubeAggregator(poolId string, year int, month int) AnswPeriod {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	poolIdObject, _ := primitive.ObjectIDFromHex(poolId)
 
-	matchStage := bson.D{}
+	matchStage := bson.D{{"$match", bson.D{{"_id", bson.D{{"$exists", 1}}}}}}
 
-	if year==0 && month==0 {
-		matchStage = bson.D{{"$match", bson.D{{"pool_id", poolIdObject}}}}
-	}
+	keyDate:="$year"
 
 	if year!=0 && month==0 {
 		y1 := strconv.Itoa(year)
 		y2 := strconv.Itoa(year + 1)
-		matchStage = bson.D{{"$match", bson.D{{"pool_id", poolIdObject}, {"timestamp", bson.D{{"$gte", StrToDate(y1 + "-01-01")}, {"$lt", StrToDate(y2 + "-01-01")}}}}}}
+		matchStage = bson.D{{"$match", bson.D{{"timestamp", bson.D{{"$gte", StrToDate(y1 + "-01-01")}, {"$lt", StrToDate(y2 + "-01-01")}}}}}}
+		keyDate = "$month"
 	}
 
 	if year!=0 && month!=0 {
@@ -200,13 +194,14 @@ func (m *MongoStructure) CubeAggregator(poolId string, year int, month int) Answ
 			year++
 		}
 		dateTo := strconv.Itoa(year) + "-" + strconv.Itoa(monthTo) + "-01"
-		matchStage = bson.D{{"$match", bson.D{{"pool_id", poolIdObject}, {"timestamp", bson.D{{"$gte", StrToDate(dateFrom)}, {"$lt", StrToDate(dateTo)}}}}}}
+		matchStage = bson.D{{"$match", bson.D{{"timestamp", bson.D{{"$gte", StrToDate(dateFrom)}, {"$lt", StrToDate(dateTo)}}}}}}
+		keyDate = "$dayOfMonth"
 	}
 
 
 	groupStage := bson.D{{"$group",
 		bson.D{
-			{"_id", bson.D{{"$year", "$timestamp"}}},
+			{"_id", bson.D{{keyDate, "$timestamp"}}},
 			{"total", bson.D{{"$sum", "$numeric"}}},
 			{"cases", bson.D{{"$addToSet", "$object"}}},
 		},
@@ -218,7 +213,7 @@ func (m *MongoStructure) CubeAggregator(poolId string, year int, month int) Answ
 		},
 	}}
 	sortStage := bson.D{{"$sort", bson.D{{"_id", 1}}}}
-	agg, err := m.collection("test").Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, projectStage, sortStage})
+	agg, err := m.collection(poolId).Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, projectStage, sortStage})
 
 	if err != nil {
 		log.Println(err)
@@ -227,6 +222,8 @@ func (m *MongoStructure) CubeAggregator(poolId string, year int, month int) Answ
 	if err = agg.All(ctx, &result); err != nil {
 		log.Println("When distinctObjects ->", err)
 	}
+
+	fmt.Println(poolId)
 
 	return prepareForFront(result)
 }

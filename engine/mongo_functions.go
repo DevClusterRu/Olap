@@ -11,13 +11,9 @@ import (
 )
 
 
-func (m *MongoStructure) InsertRecord(document bson.M) {
+func (m *MongoStructure) InsertRecord(poolId string, document bson.M) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	poolId, _ := primitive.ObjectIDFromHex(document["pool_id"].(string))
-	document["pool_id"] = poolId
-	//doc := bson.M{"pool_id": poolId, "object": object, "event": event, "timestamp": StrToDate(tme)}
-	m.collection("test").InsertOne(ctx, document, nil)
-	//pool string, object string, event string, tme string
+	m.collection(poolId).InsertOne(ctx, document, nil)
 }
 
 func (m *MongoStructure) AddPool(name string, description string) string {
@@ -33,7 +29,6 @@ func (m *MongoStructure) AddPool(name string, description string) string {
 	} else {
 		return res.InsertedID.(primitive.ObjectID).Hex()
 	}
-
 }
 
 func (m *MongoStructure) PoolStatusChange(id string, status string) bool {
@@ -60,28 +55,9 @@ func (m *MongoStructure) PoolList() string {
 	return string(b)
 }
 
-func (m *MongoStructure) RemovePool(id string) (*mongo.DeleteResult, error) {
+func (m *MongoStructure) RemovePool(poolId string) (*mongo.DeleteResult, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	idh, _ := primitive.ObjectIDFromHex(id)
-	return m.collection("pools").DeleteOne(ctx, bson.M{"_id": idh})
-	//return true
-}
-
-func (m *MongoStructure) CreateLink(poolId string, from string, to string) bool {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	idh, _ := primitive.ObjectIDFromHex(poolId)
-	doc := bson.M{"pool_id": idh, "link_from": from, "link_to": to}
-	_, err := m.collection("links").InsertOne(ctx, doc)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	return true
-}
-
-func (m *MongoStructure) RemoveLink(linkId string) (*mongo.DeleteResult, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	idl, _ := primitive.ObjectIDFromHex(linkId)
-	return m.collection("links").DeleteOne(ctx, bson.M{"_id": idl})
-
+	poolIdH, _ := primitive.ObjectIDFromHex(poolId)
+	m.collection(poolId).Drop(ctx)
+	return m.collection("pools").DeleteOne(ctx, bson.M{"_id": poolIdH})
 }

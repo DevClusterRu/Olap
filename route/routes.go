@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
 	"net/http"
 	"olap/engine"
@@ -162,13 +161,10 @@ func stream(w http.ResponseWriter, req *http.Request, poolId string) {
 			fmt.Println(err.Error())
 			return
 		}
-		poolId, _ := primitive.ObjectIDFromHex(poolId)
-		p["pool_id"] = poolId
-
 		p["timestamp"] = engine.StrToDate(p["timestamp"].(string))
 
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		engine.Mongo.Client.Database(engine.Mongo.DB).Collection("test").InsertOne(ctx, p)
+		engine.Mongo.Client.Database(engine.Mongo.DB).Collection(poolId).InsertOne(ctx, p)
 		fmt.Fprintf(w, "OK")
 	}
 }
