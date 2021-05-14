@@ -52,10 +52,9 @@ func  DoGraph(agr AggregationResult) string {
 		}
 
 
-
 		//TODO Decorate me!
 		nodesPointers[v].SetShape(cgraph.HexagonShape)
-		nodesPointers[v].SetLabel("T")
+		nodesPointers[v].SetLabel(nodeName)
 		nodesPointers[v].SetComment("Some comment")
 
 		//fmt.Println(nodeName)

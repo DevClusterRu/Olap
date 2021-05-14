@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"olap/engine"
 	"strconv"
 	"testing"
 	"time"
@@ -107,9 +108,13 @@ func TestTme(t *testing.T)  {
 	fmt.Println(tm.Format("20060102150405"+salt))
 }
 
-func TestGraphPoolAggregation(t *testing.T)  {
-//	engine.Init()
-//	engine.DoGraph(engine.Mongo.GraphPoolAggregation("607fe9aadf1560b2a03d776d"))
+func TestAggregateByYear(t *testing.T)  {
+	engine.Init()
+	engine.Mongo.AggregateByYear("607fe9aadf1560b2a03d776d")
+}
+func TestAggregateByMonth(t *testing.T)  {
+	engine.Init()
+	fmt.Println(engine.Mongo.AggregateByMonth("607fe9aadf1560b2a03d776d", 2014))
 }
 
 //

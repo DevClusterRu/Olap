@@ -12,15 +12,26 @@ import (
 	"olap/files"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
+func getSegments(s string) []string {
+	var response []string
+	res := strings.Split(s, "/")
+	for _, v := range res {
+		if v != "" {
+			response = append(response, v)
+		}
+	}
+	return response
+}
+
 func checkMethod(w http.ResponseWriter, req *http.Request) bool {
-	if req.Method=="POST"{
+	if req.Method == "POST" {
 		return true
-	} else{
+	} else {
 		fmt.Fprintf(w, "Sorry, only POST method supported.")
 	}
 	return false
@@ -102,34 +113,48 @@ func PoolRemoveHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func LinkCreateHandler(w http.ResponseWriter, req *http.Request) {
+
+
+func ChartAggregateByYearHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	if req.Form.Get("poolId") != "" {
-		if engine.Mongo.CreateLink(req.Form.Get("poolId"), req.Form.Get("from"), req.Form.Get("to")) == true {
-			fmt.Fprintf(w, "OK")
-		} else {
-			fmt.Fprintf(w, "ERROR")
-		}
-	} else {
-		fmt.Fprintf(w, "Dont see poolId")
-	}
+	result := engine.Mongo.CubeAggregator(req.Form.Get("poolId"),0,0)
+	b, _ := json.Marshal(result)
+	w.Header().Set("content-Type", "application/json")
+	fmt.Fprintf(w, string(b))
 }
 
-func LinkRemoveHandler(w http.ResponseWriter, req *http.Request) {
+func ChartAggregateByMonthHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	if req.Form.Get("linkId") != "" {
-		res, err := engine.Mongo.RemoveLink(req.Form.Get("linkId"))
-		if err != nil {
-			fmt.Fprintf(w, err.Error())
-		} else {
-			fmt.Fprintf(w, strconv.Itoa(int(res.DeletedCount)))
-		}
-	} else {
-		fmt.Fprintf(w, "ERROR")
+	y, e := strconv.Atoi(req.Form.Get("year"))
+	if e != nil {
+		fmt.Fprintf(w, "Year error")
+		return
 	}
+	result := engine.Mongo.CubeAggregator(req.Form.Get("poolId"), y,0)
+	b, _ := json.Marshal(result)
+	w.Header().Set("content-Type", "application/json")
+	fmt.Fprintf(w, string(b))
 }
 
-func StreamHandler(w http.ResponseWriter, req *http.Request) {
+func ChartAggregateByDayHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	y, e := strconv.Atoi(req.Form.Get("year"))
+	if e != nil {
+		fmt.Fprintf(w, "Year error")
+		return
+	}
+	m, e := strconv.Atoi(req.Form.Get("month"))
+	if e != nil {
+		fmt.Fprintf(w, "Month error")
+		return
+	}
+	result := engine.Mongo.CubeAggregator(req.Form.Get("poolId"), y, m)
+	b, _ := json.Marshal(result)
+	w.Header().Set("content-Type", "application/json")
+	fmt.Fprintf(w, string(b))
+}
+
+func stream(w http.ResponseWriter, req *http.Request, poolId string) {
 	if checkMethod(w, req) {
 		var p bson.M
 		err := json.NewDecoder(req.Body).Decode(&p)
@@ -137,8 +162,11 @@ func StreamHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-		poolId, _ := primitive.ObjectIDFromHex(p["poolId"].(string))
-		p["poolId"] = poolId
+		poolId, _ := primitive.ObjectIDFromHex(poolId)
+		p["pool_id"] = poolId
+
+		p["timestamp"] = engine.StrToDate(p["timestamp"].(string))
+
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		engine.Mongo.Client.Database(engine.Mongo.DB).Collection("test").InsertOne(ctx, p)
 		fmt.Fprintf(w, "OK")
@@ -147,7 +175,10 @@ func StreamHandler(w http.ResponseWriter, req *http.Request) {
 
 func EmptyHandler(w http.ResponseWriter, req *http.Request) {
 
-	var validID = regexp.MustCompile(`\/.*$`)
-	fmt.Println(validID.FindString(req.URL.Path))
+	seg := getSegments(req.URL.Path)
+	if len(getSegments(req.URL.Path)) == 3 && seg[0] == "api" && seg[1] == "stream" {
+		stream(w, req, seg[2])
+	}
+
 	fmt.Fprintf(w, "U on root")
 }
